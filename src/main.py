@@ -8,15 +8,17 @@ from contextlib import asynccontextmanager
 import logging
 import time
 import asyncio
+from datetime import datetime
 from prometheus_client import make_asgi_app, Counter, Histogram
 import sentry_sdk
 
-from .api import plans, subscriptions, usage, invoices, payments
+from .api import plans, subscriptions, usage, invoices
 from .core.config import settings
-from .core.database import engine, Base
+from .core.database import engine, Base, SessionLocal
 from .core.exceptions import BillingError
 from .consumers.usage_consumer import UsageEventConsumer
 from .services.billing_cycle import BillingCycleService
+from .services.invoicing import InvoicingService
 from .services.pricing import PricingService
 
 # Configure logging
@@ -25,6 +27,8 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+# ... rest of the file
 
 # Initialize Sentry if configured
 if settings.SENTRY_DSN:
@@ -239,7 +243,7 @@ app.include_router(plans.router, prefix="/api/v1")
 app.include_router(subscriptions.router, prefix="/api/v1")
 app.include_router(usage.router, prefix="/api/v1")
 app.include_router(invoices.router, prefix="/api/v1")
-app.include_router(payments.router, prefix="/api/v1")
+#app.include_router(payments.router, prefix="/api/v1")
 
 
 if __name__ == "__main__":

@@ -2,16 +2,18 @@
 Kafka consumer for usage events.
 """
 import asyncio
-from aiokafka import AIOKafkaConsumer
 import json
 import logging
 from typing import Dict
+
+from aiokafka import AIOKafkaConsumer
 
 from ..services.metering import UsageMeteringService
 from ..core.database import SessionLocal
 from ..core.config import settings
 
 logger = logging.getLogger(__name__)
+    # ... class implementation
 
 
 class UsageEventConsumer:

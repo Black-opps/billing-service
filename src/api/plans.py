@@ -5,11 +5,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
+from datetime import datetime
 
 from ..core.database import get_db
-from ..core.security import require_permission
+from ..core.security import require_permission, get_current_user
 from ..services.pricing import PricingService
 from ..models.plan import Plan
+from ..models.user import User
 from ..schemas.plan import (
     PlanCreate,
     PlanUpdate,
@@ -19,6 +21,8 @@ from ..schemas.plan import (
 )
 
 router = APIRouter(prefix="/plans", tags=["plans"])
+
+# ... rest of the file
 
 
 @router.get("/", response_model=List[PlanResponse])

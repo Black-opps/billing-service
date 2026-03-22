@@ -1,7 +1,7 @@
 ﻿"""
 Usage metering models.
 """
-from sqlalchemy import Column, String, Float, Integer, JSON, DateTime, Enum, ForeignKey, BigInteger
+from sqlalchemy import Column, String, Float, Integer, Boolean, JSON, DateTime, Enum, ForeignKey, BigInteger, Index, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import uuid
@@ -13,10 +13,10 @@ from ..core.database import Base
 
 class MetricType(str, enum.Enum):
     """Types of usage metrics."""
-    COUNT = "count"  # Number of occurrences
-    DURATION = "duration"  # Time in seconds
-    VOLUME = "volume"  # Data volume in MB
-    RATE = "rate"  # Per second/minute
+    COUNT = "count"
+    DURATION = "duration"
+    VOLUME = "volume"
+    RATE = "rate"
 
 
 class UsageRecord(Base):

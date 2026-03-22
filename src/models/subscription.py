@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 import enum
 
 from ..core.database import Base
+from .plan import BillingInterval  # Import this from plan.py
 
 
 class SubscriptionStatus(str, enum.Enum):

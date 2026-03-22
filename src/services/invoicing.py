@@ -36,16 +36,18 @@ class InvoicingService:
         date_part = datetime.utcnow().strftime("%Y%m")
         random_part = ''.join(random.choices(string.digits, k=6))
         
-        invoice_number = f"{prefix}-{datePart}-{randomPart}"
+        invoice_number = f"{prefix}-{date_part}-{random_part}"
         
         # Ensure uniqueness
         while self.db.query(Invoice).filter(
             Invoice.invoice_number == invoice_number
         ).first():
             random_part = ''.join(random.choices(string.digits, k=6))
-            invoice_number = f"{prefix}-{datePart}-{randomPart}"
+            invoice_number = f"{prefix}-{date_part}-{random_part}"
         
         return invoice_number
+    
+    # ... rest of the class implementation
     
     async def generate_invoice(
         self,

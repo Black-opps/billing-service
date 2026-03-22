@@ -6,7 +6,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from ..core.database import get_db
 from ..core.security import get_current_user, require_permission
@@ -21,6 +21,8 @@ from ..schemas.invoice import (
 )
 
 router = APIRouter(prefix="/invoices", tags=["invoices"])
+
+# ... rest of the file
 
 
 @router.post("/", response_model=InvoiceResponse, status_code=201)

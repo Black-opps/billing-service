@@ -10,11 +10,13 @@ from datetime import datetime, timedelta
 from ..models.plan import Plan, DEFAULT_PLANS
 from ..models.subscription import Subscription
 from ..core.exceptions import PricingError
+from ..core.config import settings
 
 logger = logging.getLogger(__name__)
 
 
 class PricingService:
+    # ... class implementation
     """Service for managing pricing and discounts."""
     
     def __init__(self, db: Session):

@@ -11,6 +11,7 @@ from ..core.database import get_db
 from ..core.security import get_current_user, require_permission
 from ..services.metering import UsageMeteringService
 from ..models.user import User
+from ..models.usage import UsageAlert
 from ..schemas.usage import (
     UsageRecordCreate,
     UsageRecordResponse,
@@ -19,6 +20,8 @@ from ..schemas.usage import (
 )
 
 router = APIRouter(prefix="/usage", tags=["usage"])
+
+# ... rest of the file
 
 
 @router.post("/track", status_code=201)

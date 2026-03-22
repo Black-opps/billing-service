@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from uuid import UUID
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from ..core.database import get_db
 from ..core.security import get_current_user, require_permission
@@ -22,6 +22,8 @@ from ..schemas.subscription import (
 )
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])
+
+# ... rest of the file
 
 
 @router.post("/", response_model=SubscriptionResponse, status_code=201)
