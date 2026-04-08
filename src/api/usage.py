@@ -8,27 +8,22 @@ from uuid import UUID
 from datetime import datetime, timedelta
 
 from ..core.database import get_db
-from ..core.security import get_current_user, require_permission
+from ..core.security import require_permission, get_current_tenant
 from ..services.metering import UsageMeteringService
-from ..models.user import User
-from ..models.usage import UsageAlert
 from ..schemas.usage import (
     UsageRecordCreate,
-    UsageRecordResponse,
     UsageSummaryResponse,
     UsageAlertResponse
 )
 
-router = APIRouter(prefix="/usage", tags=["usage"])
-
-# ... rest of the file
+router = APIRouter(prefix="/usage", tags=["Usage"])
 
 
 @router.post("/track", status_code=201)
 async def track_usage(
     usage_data: UsageRecordCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_permission("track:usage"))
+    tenant_id: str = Depends(get_current_tenant)
 ):
     """Track a usage event."""
     metering = UsageMeteringService(db)
@@ -50,15 +45,15 @@ async def track_usage(
 
 @router.get("/current/{tenant_id}")
 async def get_current_usage(
-    tenant_id: UUID,
+    tenant_id: str,
     metric_name: str = Query(..., description="Metric name"),
     period: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_tenant_id: str = Depends(get_current_tenant)
 ):
     """Get current usage for a metric."""
     # Check access
-    if current_user.tenant_id != tenant_id and not current_user.is_super_admin:
+    if current_tenant_id != tenant_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     metering = UsageMeteringService(db)
@@ -79,15 +74,15 @@ async def get_current_usage(
 
 @router.get("/summary/{tenant_id}", response_model=UsageSummaryResponse)
 async def get_usage_summary(
-    tenant_id: UUID,
+    tenant_id: str,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_tenant_id: str = Depends(get_current_tenant)
 ):
     """Get usage summary for a time period."""
     # Check access
-    if current_user.tenant_id != tenant_id and not current_user.is_super_admin:
+    if current_tenant_id != tenant_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     if not start_date:
@@ -120,13 +115,13 @@ async def get_usage_summary(
 
 @router.get("/limits/{tenant_id}")
 async def get_usage_limits(
-    tenant_id: UUID,
+    tenant_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_tenant_id: str = Depends(get_current_tenant)
 ):
     """Get usage limits for tenant."""
     # Check access
-    if current_user.tenant_id != tenant_id and not current_user.is_super_admin:
+    if current_tenant_id != tenant_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     metering = UsageMeteringService(db)
@@ -148,14 +143,14 @@ async def get_usage_limits(
 
 @router.post("/check/{tenant_id}")
 async def check_usage_limits(
-    tenant_id: UUID,
+    tenant_id: str,
     metrics: dict,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_tenant_id: str = Depends(get_current_tenant)
 ):
     """Check if tenant has capacity for requested usage."""
     # Check access
-    if current_user.tenant_id != tenant_id and not current_user.is_super_admin:
+    if current_tenant_id != tenant_id:
         raise HTTPException(status_code=403, detail="Access denied")
     
     metering = UsageMeteringService(db)
@@ -167,45 +162,3 @@ async def check_usage_limits(
         "has_capacity": has_capacity,
         "checked_metrics": metrics
     }
-
-
-@router.get("/alerts/{tenant_id}", response_model=List[UsageAlertResponse])
-async def get_usage_alerts(
-    tenant_id: UUID,
-    pending_only: bool = True,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Get usage alerts for tenant."""
-    # Check access
-    if current_user.tenant_id != tenant_id and not current_user.is_super_admin:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    metering = UsageMeteringService(db)
-    
-    if pending_only:
-        alerts = await metering.get_pending_alerts(tenant_id)
-    else:
-        # Get all alerts from database
-        alerts = db.query(UsageAlert).filter(
-            UsageAlert.tenant_id == tenant_id
-        ).order_by(UsageAlert.created_at.desc()).limit(100).all()
-    
-    return alerts
-
-
-@router.post("/alerts/{tenant_id}/mark-sent")
-async def mark_alerts_sent(
-    tenant_id: UUID,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Mark all pending alerts as sent."""
-    # Check access
-    if current_user.tenant_id != tenant_id and not current_user.is_super_admin:
-        raise HTTPException(status_code=403, detail="Access denied")
-    
-    metering = UsageMeteringService(db)
-    await metering.mark_alerts_sent(tenant_id)
-    
-    return {"message": "Alerts marked as sent"}

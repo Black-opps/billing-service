@@ -2,8 +2,9 @@
 Pricing plan models.
 """
 from sqlalchemy import Column, String, Float, Integer, Boolean, JSON, DateTime, Enum
-from sqlalchemy.dialects.postgresql import UUID
+from ..core.compat import CompatUUID
 import uuid
+from ..core.compat import CompatUUID
 from datetime import datetime
 import enum
 
@@ -22,7 +23,7 @@ class Plan(Base):
     
     __tablename__ = "plans"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = Column(CompatUUID, primary_key=True, default=uuid.uuid4)
     name = Column(String(100), nullable=False)
     description = Column(String(500))
     plan_id = Column(String(50), unique=True, nullable=False)  # 'free', 'starter', etc.
@@ -35,7 +36,7 @@ class Plan(Base):
     # Features and limits
     features = Column(JSON, default=list)
     limits = Column(JSON, default=dict)
-    metadata = Column(JSON, default=dict)
+    plan_metadata = Column(JSON, default=dict)
     
     # Status
     is_active = Column(Boolean, default=True)
@@ -162,3 +163,4 @@ DEFAULT_PLANS = [
         "badge": "Enterprise"
     }
 ]
+

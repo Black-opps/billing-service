@@ -2,9 +2,10 @@
 Invoice models.
 """
 from sqlalchemy import Column, String, Float, Integer, Boolean, JSON, DateTime, Enum, ForeignKey, Date
-from sqlalchemy.dialects.postgresql import UUID
+from ..core.compat import CompatUUID
 from sqlalchemy.orm import relationship
 import uuid
+from ..core.compat import CompatUUID
 from datetime import datetime, timedelta
 import enum
 
@@ -27,9 +28,9 @@ class Invoice(Base):
     
     __tablename__ = "invoices"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    subscription_id = Column(UUID(as_uuid=True), ForeignKey("subscriptions.id"), nullable=True)
+    id = Column(CompatUUID, primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(CompatUUID, nullable=False, index=True)
+    subscription_id = Column(CompatUUID, ForeignKey("subscriptions.id"), nullable=True)
     
     # Invoice identification
     invoice_number = Column(String(50), unique=True, nullable=False)
@@ -61,7 +62,7 @@ class Invoice(Base):
     pdf_url = Column(String(500), nullable=True)
     
     # Metadata
-    metadata = Column(JSON, default=dict)
+    record_metadata = Column(JSON, default=dict)
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -118,8 +119,8 @@ class InvoiceItem(Base):
     
     __tablename__ = "invoice_items"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    invoice_id = Column(UUID(as_uuid=True), ForeignKey("invoices.id", ondelete="CASCADE"), nullable=False)
+    id = Column(CompatUUID, primary_key=True, default=uuid.uuid4)
+    invoice_id = Column(CompatUUID, ForeignKey("invoices.id", ondelete="CASCADE"), nullable=False)
     
     # Item details
     description = Column(String(500), nullable=False)
@@ -134,6 +135,7 @@ class InvoiceItem(Base):
     # Metadata
     item_type = Column(String(50))  # 'subscription', 'addon', 'overage', 'credit'
     item_id = Column(String(100))  # Reference ID
-    metadata = Column(JSON, default=dict)
+    record_metadata = Column(JSON, default=dict)
     
     created_at = Column(DateTime, default=datetime.utcnow)
+

@@ -1,0 +1,9 @@
+# Enforce LF endings in repo for text files
+* text=auto eol=lf
+
+# Binary files - no conversion
+*.png binary
+*.jpg binary
+*.pdf binary
+*.zip binary
+# etc. for other binaries

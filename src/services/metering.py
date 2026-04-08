@@ -8,11 +8,12 @@ from typing import List, Optional, Dict
 import logging
 from uuid import UUID
 import json
+# Placeholder cache until Redis/Postgres added later
+BillingCache = None
 
 from ..models.usage import UsageRecord, UsageAlert, UsageAggregate, MetricType
 from ..models.subscription import Subscription
 from ..core.exceptions import MeteringError
-from ..core.database import BillingCache
 from ..core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -23,8 +24,7 @@ class UsageMeteringService:
     
     def __init__(self, db: Session):
         self.db = db
-        self.cache = BillingCache()
-    
+        self.cache = None    
     async def track_usage(
         self,
         tenant_id: UUID,

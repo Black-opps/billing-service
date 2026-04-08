@@ -2,9 +2,10 @@
 Subscription models.
 """
 from sqlalchemy import Column, String, Float, Integer, Boolean, JSON, DateTime, Enum, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from ..core.compat import CompatUUID
 from sqlalchemy.orm import relationship
 import uuid
+from ..core.compat import CompatUUID
 from datetime import datetime, timedelta
 import enum
 
@@ -27,9 +28,9 @@ class Subscription(Base):
     
     __tablename__ = "subscriptions"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    plan_id = Column(UUID(as_uuid=True), ForeignKey("plans.id"), nullable=False)
+    id = Column(CompatUUID, primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(CompatUUID, nullable=False, index=True)
+    plan_id = Column(CompatUUID, ForeignKey("plans.id"), nullable=False)
     
     # Status
     status = Column(Enum(SubscriptionStatus), default=SubscriptionStatus.TRIALING, nullable=False)
@@ -51,11 +52,11 @@ class Subscription(Base):
     canceled_at = Column(DateTime, nullable=True)
     
     # Payment
-    payment_method_id = Column(UUID(as_uuid=True), nullable=True)
+    payment_method_id = Column(CompatUUID, nullable=True)
     auto_renew = Column(Boolean, default=True)
     
     # Metadata
-    metadata = Column(JSON, default=dict)
+    record_metadata = Column(JSON, default=dict)
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -114,8 +115,8 @@ class SubscriptionItem(Base):
     
     __tablename__ = "subscription_items"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    subscription_id = Column(UUID(as_uuid=True), ForeignKey("subscriptions.id", ondelete="CASCADE"), nullable=False)
+    id = Column(CompatUUID, primary_key=True, default=uuid.uuid4)
+    subscription_id = Column(CompatUUID, ForeignKey("subscriptions.id", ondelete="CASCADE"), nullable=False)
     
     # Item details
     item_type = Column(String(50), nullable=False)  # 'plan', 'addon', 'overage'
@@ -127,7 +128,8 @@ class SubscriptionItem(Base):
     currency = Column(String(3), default="KES")
     
     # Metadata
-    metadata = Column(JSON, default=dict)
+    record_metadata = Column(JSON, default=dict)
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+

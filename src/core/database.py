@@ -1,40 +1,74 @@
 """
-Database configuration and session management.
+Database setup for billing service.
 """
 from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker, Session
-from typing import Generator
-import redis
-import json
+from sqlalchemy.orm import sessionmaker
 from contextlib import contextmanager
-import logging
-
 from .config import settings
+from .compat import CompatUUID
 
-logger = logging.getLogger(__name__)
-
-# SQLAlchemy setup
-engine = create_engine(
-    settings.DATABASE_URL,
-    pool_size=settings.DATABASE_POOL_SIZE,
-    max_overflow=settings.DATABASE_MAX_OVERFLOW,
-    pool_pre_ping=True,
-    echo=settings.DEBUG
-)
+# Handle SQLite vs PostgreSQL
+if "sqlite" in settings.DATABASE_URL:
+    engine = create_engine(
+        settings.DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        pool_size=settings.DATABASE_POOL_SIZE,
+        max_overflow=settings.DATABASE_MAX_OVERFLOW
+    )
+else:
+    engine = create_engine(
+        settings.DATABASE_URL,
+        pool_size=settings.DATABASE_POOL_SIZE,
+        max_overflow=settings.DATABASE_MAX_OVERFLOW,
+        pool_pre_ping=True
+    )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# Redis setup
-redis_client = redis.Redis.from_url(
-    settings.REDIS_URL,
-    decode_responses=True,
-    socket_connect_timeout=5
-)
+
+class BillingCache:
+    """
+    Lightweight in-memory cache for billing calculations.
+    
+    Used for:
+    - usage aggregation
+    - invoice previews
+    - quota checks
+    - subscription status lookups
+    """
+    
+    _cache = {}
+    
+    @classmethod
+    def get(cls, key: str):
+        """Get value from cache."""
+        return cls._cache.get(key)
+    
+    @classmethod
+    def set(cls, key: str, value, ttl: int = 3600):
+        """Set value in cache with TTL (ignored for now, placeholder)."""
+        cls._cache[key] = value
+    
+    @classmethod
+    def delete(cls, key: str):
+        """Delete key from cache."""
+        if key in cls._cache:
+            del cls._cache[key]
+    
+    @classmethod
+    def clear(cls):
+        """Clear entire cache."""
+        cls._cache.clear()
+    
+    @classmethod
+    def exists(cls, key: str) -> bool:
+        """Check if key exists in cache."""
+        return key in cls._cache
 
 
-def get_db() -> Generator[Session, None, None]:
+def get_db():
     """Get database session."""
     db = SessionLocal()
     try:
@@ -57,40 +91,30 @@ def db_session():
         db.close()
 
 
+def init_db():
+    """Initialize database tables."""
+    Base.metadata.create_all(bind=engine)
+    print("Database tables created/verified")
+
 class BillingCache:
-    """Redis cache for billing data."""
-    
-    @staticmethod
-    def get_subscription(tenant_id: str):
-        """Get subscription from cache."""
-        data = redis_client.get(f"subscription:{tenant_id}")
-        return json.loads(data) if data else None
-    
-    @staticmethod
-    def set_subscription(tenant_id: str, sub_data: dict):
-        """Set subscription in cache."""
-        redis_client.setex(
-            f"subscription:{tenant_id}",
-            settings.REDIS_TTL,
-            json.dumps(sub_data, default=str)
-        )
-    
-    @staticmethod
-    def invalidate_subscription(tenant_id: str):
-        """Invalidate subscription cache."""
-        redis_client.delete(f"subscription:{tenant_id}")
-    
-    @staticmethod
-    def get_usage(tenant_id: str, metric: str, period: str):
-        """Get usage from cache."""
-        data = redis_client.get(f"usage:{tenant_id}:{metric}:{period}")
-        return json.loads(data) if data else None
-    
-    @staticmethod
-    def set_usage(tenant_id: str, metric: str, period: str, usage_data: dict):
-        """Set usage in cache."""
-        redis_client.setex(
-            f"usage:{tenant_id}:{metric}:{period}",
-            3600,  # 1 hour cache for usage
-            json.dumps(usage_data, default=str)
-        )
+    """
+    Temporary in-memory cache until Redis is configured.
+    Used for usage metering aggregation.
+    """
+
+    def __init__(self):
+        self.cache = {}
+
+    def get(self, key):
+        return self.cache.get(key)
+
+    def set(self, key, value):
+        self.cache[key] = value
+
+    def increment(self, key, amount=1):
+        self.cache[key] = self.cache.get(key, 0) + amount
+        return self.cache[key]
+
+    def reset(self, key):
+        if key in self.cache:
+            del self.cache[key]

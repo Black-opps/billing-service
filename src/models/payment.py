@@ -1,10 +1,11 @@
-"""
+﻿"""
 Payment models.
 """
 from sqlalchemy import Column, String, Float, Boolean, JSON, DateTime, Enum, ForeignKey
-from sqlalchemy.dialects.postgresql import UUID
+from ..core.compat import CompatUUID
 from sqlalchemy.orm import relationship
 import uuid
+from ..core.compat import CompatUUID
 from datetime import datetime
 import enum
 
@@ -35,9 +36,9 @@ class Payment(Base):
     
     __tablename__ = "payments"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    invoice_id = Column(UUID(as_uuid=True), ForeignKey("invoices.id"), nullable=True)
+    id = Column(CompatUUID, primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(CompatUUID, nullable=False, index=True)
+    invoice_id = Column(CompatUUID, ForeignKey("invoices.id"), nullable=True)
     
     # Payment details
     amount = Column(Float, nullable=False)
@@ -56,7 +57,7 @@ class Payment(Base):
     result_description = Column(String(500), nullable=True)
     
     # Metadata
-    metadata = Column(JSON, default=dict)
+    record_metadata = Column(JSON, default=dict)
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -95,8 +96,8 @@ class PaymentMethod(Base):
     
     __tablename__ = "payment_methods"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    id = Column(CompatUUID, primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(CompatUUID, nullable=False, index=True)
     
     # Method details
     method = Column(Enum(PaymentMethod), nullable=False)
@@ -115,7 +116,7 @@ class PaymentMethod(Base):
     is_active = Column(Boolean, default=True)
     
     # Metadata
-    metadata = Column(JSON, default=dict)
+    record_metadata = Column(JSON, default=dict)
     
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -131,3 +132,4 @@ class PaymentMethod(Base):
             "is_verified": self.is_verified,
             "is_active": self.is_active
         }
+

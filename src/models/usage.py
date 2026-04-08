@@ -2,9 +2,10 @@
 Usage metering models.
 """
 from sqlalchemy import Column, String, Float, Integer, Boolean, JSON, DateTime, Enum, ForeignKey, BigInteger, Index, UniqueConstraint
-from sqlalchemy.dialects.postgresql import UUID
+from ..core.compat import CompatUUID
 from sqlalchemy.orm import relationship
 import uuid
+from ..core.compat import CompatUUID
 from datetime import datetime
 import enum
 
@@ -24,9 +25,9 @@ class UsageRecord(Base):
     
     __tablename__ = "usage_records"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    subscription_id = Column(UUID(as_uuid=True), ForeignKey("subscriptions.id"), nullable=True)
+    id = Column(CompatUUID, primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(CompatUUID, nullable=False, index=True)
+    subscription_id = Column(CompatUUID, ForeignKey("subscriptions.id"), nullable=True)
     
     # Metric
     metric_name = Column(String(100), nullable=False, index=True)  # 'transactions_parsed', 'api_calls', 'storage_mb'
@@ -41,7 +42,7 @@ class UsageRecord(Base):
     service = Column(String(50), nullable=False)  # 'parser', 'categorizer', 'analyzer', 'api'
     
     # Metadata
-    metadata = Column(JSON, default=dict)
+    record_metadata = Column(JSON, default=dict)
     idempotency_key = Column(String(255), unique=True, nullable=True)  # For deduplication
     
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -59,9 +60,9 @@ class UsageAlert(Base):
     
     __tablename__ = "usage_alerts"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    subscription_id = Column(UUID(as_uuid=True), ForeignKey("subscriptions.id"))
+    id = Column(CompatUUID, primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(CompatUUID, nullable=False, index=True)
+    subscription_id = Column(CompatUUID, ForeignKey("subscriptions.id"))
     
     # Alert details
     metric_name = Column(String(100), nullable=False)
@@ -84,9 +85,9 @@ class UsageAggregate(Base):
     
     __tablename__ = "usage_aggregates"
     
-    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    subscription_id = Column(UUID(as_uuid=True), ForeignKey("subscriptions.id"))
+    id = Column(CompatUUID, primary_key=True, default=uuid.uuid4)
+    tenant_id = Column(CompatUUID, nullable=False, index=True)
+    subscription_id = Column(CompatUUID, ForeignKey("subscriptions.id"))
     
     # Aggregation
     metric_name = Column(String(100), nullable=False)
@@ -101,3 +102,4 @@ class UsageAggregate(Base):
     __table_args__ = (
         UniqueConstraint('tenant_id', 'metric_name', 'period', name='uq_usage_aggregate'),
     )
+
