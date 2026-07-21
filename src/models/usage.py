@@ -1,105 +1,115 @@
-﻿"""
-Usage metering models.
-"""
-from sqlalchemy import Column, String, Float, Integer, Boolean, JSON, DateTime, Enum, ForeignKey, BigInteger, Index, UniqueConstraint
-from ..core.compat import CompatUUID
-from sqlalchemy.orm import relationship
+﻿# billing-service/src/models/usage.py - Complete Usage Models
+
 import uuid
-from ..core.compat import CompatUUID
 from datetime import datetime
-import enum
 
-from ..core.database import Base
-
-
-class MetricType(str, enum.Enum):
-    """Types of usage metrics."""
-    COUNT = "count"
-    DURATION = "duration"
-    VOLUME = "volume"
-    RATE = "rate"
+from sqlalchemy import Boolean, Column, DateTime, Float, Index, Integer, String, Text
+from src.core.database import Base
 
 
-class UsageRecord(Base):
-    """Individual usage record."""
-    
-    __tablename__ = "usage_records"
-    
-    id = Column(CompatUUID, primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(CompatUUID, nullable=False, index=True)
-    subscription_id = Column(CompatUUID, ForeignKey("subscriptions.id"), nullable=True)
-    
-    # Metric
-    metric_name = Column(String(100), nullable=False, index=True)  # 'transactions_parsed', 'api_calls', 'storage_mb'
-    metric_type = Column(Enum(MetricType), default=MetricType.COUNT)
-    quantity = Column(BigInteger, nullable=False, default=0)
-    
-    # Time
-    timestamp = Column(DateTime, nullable=False, index=True)
-    period = Column(String(7), nullable=False, index=True)  # '2026-03' for monthly aggregation
-    
-    # Source
-    service = Column(String(50), nullable=False)  # 'parser', 'categorizer', 'analyzer', 'api'
-    
-    # Metadata
-    record_metadata = Column(JSON, default=dict)
-    idempotency_key = Column(String(255), unique=True, nullable=True)  # For deduplication
-    
+class Usage(Base):
+    """Current usage for a tenant in the current billing period"""
+
+    __tablename__ = "usage_tracking"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, nullable=False, index=True)
+    billing_period = Column(String, nullable=False)  # "2024-07"
+
+    # Core metrics
+    transactions_processed = Column(Integer, default=0)
+    statements_uploaded = Column(Integer, default=0)
+    exports_generated = Column(Integer, default=0)
+    ai_insights_generated = Column(Integer, default=0)
+
+    # Historical tracking
+    historical_months_imported = Column(Integer, default=0)
+    earliest_transaction_date = Column(DateTime, nullable=True)
+    latest_transaction_date = Column(DateTime, nullable=True)
+
+    # Overage
+    overage_transactions = Column(Integer, default=0)
+    overage_charges = Column(Float, default=0.0)
+    overage_paid = Column(Boolean, default=False)
+
     created_at = Column(DateTime, default=datetime.utcnow)
-    
-    __table_args__ = (
-        Index('ix_usage_tenant_metric_period', 'tenant_id', 'metric_name', 'period'),
-    )
-    
-    def __repr__(self):
-        return f"<Usage {self.metric_name}: {self.quantity} at {self.timestamp}>"
-
-
-class UsageAlert(Base):
-    """Usage threshold alerts."""
-    
-    __tablename__ = "usage_alerts"
-    
-    id = Column(CompatUUID, primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(CompatUUID, nullable=False, index=True)
-    subscription_id = Column(CompatUUID, ForeignKey("subscriptions.id"))
-    
-    # Alert details
-    metric_name = Column(String(100), nullable=False)
-    threshold = Column(Float, nullable=False)  # 0.8 for 80%
-    current_usage = Column(BigInteger, nullable=False)
-    limit = Column(BigInteger, nullable=False)
-    
-    # Status
-    is_sent = Column(Boolean, default=False)
-    sent_at = Column(DateTime, nullable=True)
-    
-    created_at = Column(DateTime, default=datetime.utcnow)
-    
-    def __repr__(self):
-        return f"<UsageAlert {self.metric_name}: {self.current_usage}/{self.limit}>"
-
-
-class UsageAggregate(Base):
-    """Pre-aggregated usage for faster queries."""
-    
-    __tablename__ = "usage_aggregates"
-    
-    id = Column(CompatUUID, primary_key=True, default=uuid.uuid4)
-    tenant_id = Column(CompatUUID, nullable=False, index=True)
-    subscription_id = Column(CompatUUID, ForeignKey("subscriptions.id"))
-    
-    # Aggregation
-    metric_name = Column(String(100), nullable=False)
-    period = Column(String(7), nullable=False)  # '2026-03'
-    total = Column(BigInteger, nullable=False, default=0)
-    
-    # Breakdown by service
-    by_service = Column(JSON, default=dict)
-    
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
     __table_args__ = (
-        UniqueConstraint('tenant_id', 'metric_name', 'period', name='uq_usage_aggregate'),
+        Index("idx_usage_tenant_period", "tenant_id", "billing_period", unique=True),
+        Index(
+            "idx_usage_tenant_period_transactions",
+            "tenant_id",
+            "billing_period",
+            "transactions_processed",
+        ),
     )
 
+
+class UsageEvent(Base):
+    """Audit trail for all usage events"""
+
+    __tablename__ = "usage_events"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, nullable=False, index=True)
+    event_type = Column(String)  # "upload", "export", "ai_insight"
+    transaction_count = Column(Integer, default=0)
+    upload_id = Column(String, nullable=True)
+    file_name = Column(String, nullable=True)
+    statement_start = Column(DateTime, nullable=True)
+    statement_end = Column(DateTime, nullable=True)
+    is_historical = Column(Boolean, default=False)
+    processed = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    processed_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("idx_usage_events_tenant_processed", "tenant_id", "processed"),
+        Index("idx_usage_events_created", "created_at"),
+    )
+
+
+class OverageLog(Base):
+    """Track all overages for finance and auditing"""
+
+    __tablename__ = "overage_logs"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, nullable=False, index=True)
+    billing_period = Column(String, nullable=False)
+    threshold = Column(Integer, nullable=False)
+    actual = Column(Integer, nullable=False)
+    overage_amount = Column(Integer, nullable=False)
+    charge = Column(Float, nullable=False)
+    status = Column(String, default="pending")  # pending, charged, paid, waived
+    invoice_id = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    paid_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("idx_overage_tenant_period", "tenant_id", "billing_period"),
+        Index("idx_overage_status", "status"),
+    )
+
+
+class HistoricalBackfillRequest(Base):
+    """Track historical backfill requests for monetization"""
+
+    __tablename__ = "historical_backfill_requests"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    tenant_id = Column(String, nullable=False, index=True)
+    months_requested = Column(Integer, nullable=False)
+    months_processed = Column(Integer, default=0)
+    status = Column(
+        String, default="pending"
+    )  # pending, approved, processing, completed, failed
+    price = Column(Float, nullable=False)
+    payment_id = Column(String, nullable=True)
+    invoice_id = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    approved_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (Index("idx_backfill_tenant_status", "tenant_id", "status"),)
