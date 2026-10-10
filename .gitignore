@@ -1,6 +1,47 @@
-﻿venv/
+﻿# Python
+venv/
+env/
+ENV/
 __pycache__/
-*.pyc
+*.py[cod]
+*.so
+.python/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Environment
 .env
-*.env.*
-!.env.example
+.env.local
+.env.*.local
+.env.production
+.env.staging
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
+logs/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Uploads
+uploads/
+temp/
+
+# Secrets
+*.pem
+*.key
+*.crt

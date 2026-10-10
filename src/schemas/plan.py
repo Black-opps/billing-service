@@ -1,8 +1,10 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict
-from uuid import UUID
+# billing-service/src/schemas/plan.py
 from datetime import datetime
 from enum import Enum
+from typing import Dict, List, Optional
+from uuid import UUID
+
+from pydantic import BaseModel, Field
 
 
 class BillingInterval(str, Enum):
@@ -17,12 +19,15 @@ class PlanBase(BaseModel):
     plan_id: str
     price: float
     currency: str = "KES"
-    interval: BillingInterval = BillingInterval.MONTHLY
+    billing_interval: BillingInterval = (
+        BillingInterval.MONTHLY
+    )  # Changed from 'interval' to match API
     features: List[str] = []
     limits: Dict = {}
     is_active: bool = True
     is_public: bool = True
     badge: Optional[str] = None
+    display_order: int = 0
 
 
 class PlanCreate(PlanBase):
@@ -38,6 +43,7 @@ class PlanUpdate(BaseModel):
     is_active: Optional[bool] = None
     is_public: Optional[bool] = None
     badge: Optional[str] = None
+    display_order: Optional[int] = None
 
 
 class PlanResponse(PlanBase):
@@ -46,24 +52,4 @@ class PlanResponse(PlanBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True
-
-
-class PriceCalculationRequest(BaseModel):
-    plan_id: str
-    quantity: int = 1
-    coupon_code: Optional[str] = None
-    interval: str = "monthly"
-
-
-class PriceCalculationResponse(BaseModel):
-    plan: Dict
-    quantity: int
-    base_price: float
-    discount: float
-    subtotal: float
-    tax: float
-    tax_rate: float
-    total: float
-    currency: str
-    interval: str
+        from_attributes = True  # Changed from 'orm_mode' for Pydantic v2

@@ -44,6 +44,18 @@ class PricingService:
 
     def create_plan(self, plan_data: PlanCreate) -> Plan:
         """Create a new plan"""
+        # Convert interval string to enum
+        interval_value = (
+            plan_data.billing_interval
+            if hasattr(plan_data, "billing_interval")
+            else "monthly"
+        )
+        interval_enum = (
+            BillingInterval(interval_value)
+            if interval_value in [e.value for e in BillingInterval]
+            else BillingInterval.MONTHLY
+        )
+
         plan = Plan(
             id=str(uuid.uuid4()),
             plan_id=plan_data.plan_id,
@@ -51,7 +63,7 @@ class PricingService:
             description=plan_data.description,
             price=plan_data.price,
             currency=plan_data.currency or "KES",
-            interval=plan_data.interval or "monthly",
+            interval=interval_enum,
             features=plan_data.features or [],
             limits=plan_data.limits or {},
             is_active=plan_data.is_active if hasattr(plan_data, "is_active") else True,
@@ -75,7 +87,14 @@ class PricingService:
 
         update_data = plan_data.dict(exclude_unset=True)
         for key, value in update_data.items():
-            setattr(plan, key, value)
+            # Handle interval separately as it's an enum
+            if key == "billing_interval" and value:
+                plan.interval = BillingInterval(value)
+            elif key == "interval":
+                # Skip if it's the old field name
+                continue
+            else:
+                setattr(plan, key, value)
 
         self.db.commit()
         self.db.refresh(plan)
@@ -103,6 +122,14 @@ class PricingService:
 
         count = 0
         for plan_data in DEFAULT_PLANS:
+            # Convert interval string to enum
+            interval_str = plan_data.get("interval", "monthly")
+            interval_enum = (
+                BillingInterval(interval_str)
+                if interval_str in [e.value for e in BillingInterval]
+                else BillingInterval.MONTHLY
+            )
+
             plan = Plan(
                 id=str(uuid.uuid4()),
                 plan_id=plan_data["plan_id"],
@@ -110,7 +137,7 @@ class PricingService:
                 description=plan_data["description"],
                 price=plan_data["price"],
                 currency=plan_data.get("currency", "KES"),
-                interval=plan_data.get("interval", "monthly"),
+                interval=interval_enum,
                 features=plan_data.get("features", []),
                 limits=plan_data.get("limits", {}),
                 is_active=True,
@@ -325,7 +352,7 @@ class PricingService:
             "description": plan.description,
             "price": plan.price,
             "currency": plan.currency,
-            "interval": plan.interval,
+            "interval": plan.interval.value if plan.interval else "monthly",
             "features": plan.features,
             "badge": plan.badge,
             "is_active": plan.is_active,

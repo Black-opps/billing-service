@@ -8,17 +8,23 @@ import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 
+import httpx  # Added for JWKS endpoint
 import sentry_sdk
-from fastapi import FastAPI, Request, status
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from prometheus_client import Counter, Histogram, make_asgi_app
 
+# Add this import at the top
 # Import routers
+from .api import test_sdk  # Add this line
 from .api import invoices, plans, subscriptions, usage
 from .api.internal import router as internal_router  # Moved here
 from .core.config import settings
 from .core.database import Base, SessionLocal, engine
+
+# Add before routers
+from .core.dependencies import get_current_tenant, get_current_user
 from .core.exceptions import BillingError
 from .services.billing_cycle import BillingCycleService
 from .services.invoicing import InvoicingService
@@ -243,7 +249,43 @@ async def general_exception_handler(request: Request, exc: Exception):
     )
 
 
-# Health check endpoint
+# ==================== JWKS ENDPOINT ====================
+@app.get("/.well-known/jwks.json")
+async def get_jwks():
+    """
+    Proxy JWKS from Auth Service.
+
+    This endpoint allows the billing service to serve JWKS for JWT validation.
+    It proxies requests to the auth service's JWKS endpoint.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.get(
+                f"{settings.AUTH_SERVICE_URL}/.well-known/jwks.json"
+            )
+            response.raise_for_status()
+            return response.json()
+    except httpx.TimeoutException:
+        logger.error("Timeout connecting to auth service for JWKS")
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={"detail": "Auth service unavailable"},
+        )
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Auth service returned error: {e}")
+        return JSONResponse(
+            status_code=e.response.status_code,
+            content={"detail": "Error fetching JWKS"},
+        )
+    except Exception as e:
+        logger.error(f"Error fetching JWKS: {e}")
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"detail": "Internal server error"},
+        )
+
+
+# ==================== HEALTH CHECK ENDPOINT ====================
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
@@ -265,7 +307,7 @@ async def health_check():
     }
 
 
-# Root endpoint
+# ==================== ROOT ENDPOINT ====================
 @app.get("/")
 async def root():
     """Root endpoint with service info."""
@@ -279,8 +321,44 @@ async def root():
     }
 
 
+# ==================== DIRECT TEST ENDPOINTS ====================
+@app.get("/api/v1/test/tenant")
+async def test_tenant_direct(
+    tenant_id: str = Depends(get_current_tenant), user: dict = Depends(get_current_user)
+):
+    """
+    Direct test endpoint for tenant extraction.
+    This bypasses the test_sdk router to debug tenant extraction.
+    """
+    return {
+        "success": True,
+        "tenant_id": tenant_id,
+        "user_email": user.get("email"),
+        "user_role": user.get("role"),
+    }
+
+
+@app.get("/api/v1/test/user")
+async def test_user_direct(user: dict = Depends(get_current_user)):
+    """
+    Direct test endpoint for user extraction.
+    This bypasses the test_sdk router to debug user extraction.
+    """
+    return {
+        "success": True,
+        "user": {
+            "id": user.get("sub"),
+            "email": user.get("email"),
+            "role": user.get("role"),
+            "tenant_id": user.get("tenant_id"),
+        },
+    }
+
+
 # ==================== INCLUDE ROUTERS ====================
 # Register all routers AFTER app is created
+# After app creation, add the router
+app.include_router(test_sdk.router, prefix="/api/v1")
 app.include_router(plans.router, prefix="/api/v1")
 app.include_router(subscriptions.router, prefix="/api/v1")
 app.include_router(usage.router, prefix="/api/v1")
@@ -288,6 +366,22 @@ app.include_router(invoices.router, prefix="/api/v1")
 app.include_router(internal_router, prefix="/api/v1")  # Internal router moved here
 
 
+# Add this right before the main block
+@app.on_event("startup")
+async def startup_event():
+    """Log all registered routes on startup."""
+    import logging
+
+    logger = logging.getLogger(__name__)
+    logger.info("=" * 50)
+    logger.info("REGISTERED ROUTES:")
+    for route in app.routes:
+        if hasattr(route, "path") and hasattr(route, "methods"):
+            logger.info(f"  {route.path} -> {route.methods}")
+    logger.info("=" * 50)
+
+
+# ==================== MAIN ENTRY POINT ====================
 if __name__ == "__main__":
     import uvicorn
 
